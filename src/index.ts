@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import prompts from "prompts";
 import { shuffle, pick } from "./random/index.js";
 
-type Data = [string, string][];
+type Data = [string | string[], string][];
 
 const data = JSON.parse(
   readFileSync("data.json", { encoding: "utf-8" })
@@ -68,9 +68,30 @@ class Question {
   }
 }
 
-const QUESTIONS_AMOUNT = 15;
+const { QUESTIONS_AMOUNT } = await prompts({
+  initial: Infinity,
+  max: Infinity,
+  message: "practice length",
+  min: 1,
+  name: "QUESTIONS_AMOUNT",
+  type: "number",
+});
 
 let score = 0;
+
+const createChoices = (entries: Data) => {
+  const choices = [];
+
+  for (const [options] of entries) {
+    for (const option of options) {
+      choices.push(...option);
+    }
+  }
+
+  choices.sort();
+
+  return choices;
+};
 
 for (let i = 0; i < QUESTIONS_AMOUNT; ++i) {
   const item = pick(data)!;
@@ -79,15 +100,7 @@ for (let i = 0; i < QUESTIONS_AMOUNT; ++i) {
   list.length = 2;
   list.push(item);
 
-  const choices = [];
-
-  for (const [furigana] of list) {
-    for (const c of furigana) {
-      choices.push(c);
-    }
-  }
-
-  choices.sort();
+  const choices = createChoices(list);
 
   const q = new Question({
     choices,
@@ -95,15 +108,33 @@ for (let i = 0; i < QUESTIONS_AMOUNT; ++i) {
   });
 
   const answer = await q.prompt();
-  const isCorrect = answer === item[0];
+
+  let isCorrect = false;
+
+  if (answer) {
+    isCorrect =
+      typeof item[0] === "string"
+        ? item[0] === answer
+        : item[0].includes(answer);
+
+    if (isCorrect) {
+      ++score;
+    }
+  }
+
+  let message: string;
 
   if (isCorrect) {
-    ++score;
+    message = "correct";
+  } else {
+    message = `correct answer: ${
+      typeof item[0] === "string" ? item[0] : item[0].join(", ")
+    }`;
   }
 
   const response = await prompts({
     initial: true,
-    message: isCorrect ? `correct` : `correct answer: ${item[0]}`,
+    message,
     name: "continue",
     type: "confirm",
   });
