@@ -15,7 +15,6 @@ type QuestionOptions = {
 
 class Question {
   choices: prompts.Choice[];
-  RETURN = { title: "<RETURN>" };
   state: prompts.Choice[] = [];
 
   constructor(readonly options: QuestionOptions) {
@@ -28,7 +27,15 @@ class Question {
     while (true) {
       console.clear();
 
-      const choices = [this.RETURN];
+      const choices = this.answer
+        ? [
+            {
+              title: this.answer,
+              description: "Return to submit",
+              value: -1,
+            } as prompts.Choice,
+          ]
+        : [];
 
       for (let choice of this.choices) {
         if (!this.state.includes(choice)) {
@@ -36,13 +43,10 @@ class Question {
         }
       }
 
-      const message = `${this.options.message} ${
-        this.state.length ? `(${this.answer})` : ""
-      }`;
-
       const options = {
         choices,
-        message,
+        hint: this.answer,
+        message: this.options.message,
         name: "answer" as const,
         type: "select" as const,
       };
@@ -55,7 +59,7 @@ class Question {
         }
 
         this.state.pop();
-      } else if (answer) {
+      } else if (answer !== -1) {
         this.state.push(options.choices[answer]);
       } else {
         return this.answer;
@@ -96,6 +100,7 @@ const createChoices = (entries: Data) => {
 for (let i = 0; i < QUESTIONS_AMOUNT; ++i) {
   const item = pick(data)!;
   const list = shuffle(data.filter((i) => i !== item));
+  const possibleAnswers = typeof item[0] === "string" ? [item[0]] : item[0];
 
   list.length = 2;
   list.push(item);
@@ -112,10 +117,7 @@ for (let i = 0; i < QUESTIONS_AMOUNT; ++i) {
   let isCorrect = false;
 
   if (answer) {
-    isCorrect =
-      typeof item[0] === "string"
-        ? item[0] === answer
-        : item[0].includes(answer);
+    isCorrect = possibleAnswers.includes(answer);
 
     if (isCorrect) {
       ++score;
@@ -125,7 +127,13 @@ for (let i = 0; i < QUESTIONS_AMOUNT; ++i) {
   let message: string;
 
   if (isCorrect) {
-    message = "correct";
+    message = `correct`;
+
+    if (possibleAnswers.length > 1) {
+      message += `. possible answer: ${possibleAnswers
+        .filter((v) => v !== answer)
+        .join(",")}`;
+    }
   } else {
     message = `correct answer: ${
       typeof item[0] === "string" ? item[0] : item[0].join(", ")
